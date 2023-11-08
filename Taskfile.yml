@@ -1,0 +1,84 @@
+version: "3"
+env:
+  CGO_ENABLED: 0
+
+vars:
+  Program: "find-latest-gopkg"
+
+tasks:
+  .gosrc: &gosrc ## Reusable snippet for any task that uses go.mod, go.sum, or **/*.go
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+
+  all:
+    desc: tidy, fmt, vet, test, build
+    cmds:
+      - task: pre
+      - task: test
+      - task: build
+
+  build: &build
+    <<: *gosrc
+    desc: go build
+    generates:
+      - "{{.Program}}"
+    cmds:
+      - go build -trimpath -gcflags="all=-N -l" -o {{.Program}} ./cmd/main.go
+
+  build-verbose:
+    <<: *build
+    desc: go build verbosely
+    cmds:
+      - go build  -trimpath -gcflags="all=-N -l" -x -v -o {{.Program}} ./cmd/main.go
+
+  rebuild:
+    desc: clean, build
+    cmds:
+      - task: clean
+      - task: pre
+      - task: build-verbose
+
+  run:
+    desc: go run ./cmd/main.go [OPTIONS] MODULE [MODULE ...]
+    cmd: go run ./cmd/main.go {{.CLI_ARGS}}
+
+  pre:
+    desc: tidy fmt vet
+    cmds:
+      - task: tidy
+      - task: fmt
+      - task: vet
+
+  tidy:
+    desc: go mod tidy
+    cmd: go mod tidy
+    <<: *gosrc
+
+  download:
+    deps:
+      - tidy
+    desc: go mod download
+    cmd: go mod download
+
+  vet:
+    desc: go vet
+    cmd: go vet
+    <<: *gosrc
+
+  fmt:
+    desc: go fmt (gofmt -s -w)
+    cmd: gofmt -s -w cmd/ pkg/
+    <<: *gosrc
+
+  test:
+    desc: go test
+    cmd: go test -v
+    <<: *gosrc
+
+  clean:
+    desc: go clean
+    cmds:
+      - go clean -x -i -r
+      - rm -f {{.Program}}
